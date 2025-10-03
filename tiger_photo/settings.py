@@ -13,6 +13,8 @@ INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
     "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
     "corsheaders", "rest_framework", "image",
+    "drf_spectacular",
+    "drf_spectacular_sidecar"
 ]
 
 MIDDLEWARE = [
@@ -87,3 +89,18 @@ TEMPLATES = [
         },
     },
 ]
+
+
+REST_FRAMEWORK.update({
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+})
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Tiger Photo API",
+    "DESCRIPTION": "AI 변환/최종 이미지/QR 세션 API",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,  # /schema/ 경로는 따로 열어주므로 False 권장
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SERVERS": [{"url": "http://127.0.0.1:8000"}],  # 필요시 prod/staging 추가
+    # 인증 쓰면 여기에 SECURITY_SCHEMES 정의 가능 (예: JWT)
+}

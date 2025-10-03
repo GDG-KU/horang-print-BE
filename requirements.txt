@@ -8,3 +8,5 @@ Pillow==10.4.0
 celery==5.4.0
 redis==5.0.8
 python-dotenv==1.0.1
+drf-spectacular==0.28.0
+drf-spectacular-sidecar==2025.10.1

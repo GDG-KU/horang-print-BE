@@ -3,7 +3,6 @@ from .models import Session, Style
 
 class SessionCreateSerializer(serializers.Serializer):
     style_id = serializers.IntegerField()
-    user_preferences = serializers.JSONField(required=False)
 
 class ImageUploadSerializer(serializers.Serializer):
     session_uuid = serializers.UUIDField()
@@ -18,3 +17,8 @@ class AIWebhookSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=["SUCCEEDED","FAILED"])
     image_url = serializers.URLField(required=False)
     meta = serializers.JSONField(required=False)
+
+class StyleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Style
+        fields = ("id","code","name","description","is_active")

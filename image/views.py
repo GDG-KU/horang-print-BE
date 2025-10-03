@@ -9,12 +9,15 @@ from django.shortcuts import get_object_or_404
 from .models import Session, Style, ImageAsset, AIJob, QRCode
 from .serializers import (
     SessionCreateSerializer, ImageUploadSerializer,
-    FinalizeSerializer, AIWebhookSerializer
+    FinalizeSerializer, AIWebhookSerializer, StyleSerializer
 )
 from .utils.gcs import upload_fileobj, build_object_name, upload_bytes
 from .utils.images import get_image_size
 from .utils.qr import build_redirect_url
 from .tasks import generate_qr_task
+from drf_spectacular.utils import (
+    extend_schema, OpenApiParameter, OpenApiTypes, OpenApiResponse, OpenApiExample
+)
 
 def _generate_slug():
     # 짧고 URL 친화적인 슬러그
@@ -23,6 +26,33 @@ def _generate_slug():
     return ''.join(secrets.choice(alphabet) for _ in range(9))
 
 class SessionCreateView(APIView):
+    @extend_schema(
+        tags=["Session"],
+        summary="세션 생성",
+        request=SessionCreateSerializer,
+        responses={
+            201: OpenApiResponse(
+                response=OpenApiTypes.OBJECT,
+                description="세션이 생성되고 QR 발급 작업이 큐에 등록됩니다."
+            ),
+            400: OpenApiResponse(description="유효성 검증 오류")
+        },
+        examples=[
+            OpenApiExample(
+                name="create-session-success",
+                response_only=True,
+                value={
+                    "session_uuid": "c1f9c3d6-2a1b-4a1b-9d1c-2f5f7d3a0c1e",
+                    "status": "CREATED",
+                    "qr": {
+                        "slug": "a1b2c3d4e",
+                        "redirect_url": "http://127.0.0.1:8000/s/a1b2c3d4e",
+                        "status": "PENDING"
+                    }
+                }
+            )
+        ]
+    )
     def post(self, request):
         s = SessionCreateSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -31,7 +61,6 @@ class SessionCreateView(APIView):
             qr = QRCode.objects.create(slug=_generate_slug())
             session = Session.objects.create(
                 style=style,
-                user_preferences=s.validated_data.get("user_preferences", {}),
                 status=Session.Status.CREATED,
                 qr=qr
             )
@@ -51,6 +80,14 @@ class SessionCreateView(APIView):
         return Response(data, status=status.HTTP_201_CREATED)
 
 class SessionDetailView(APIView):
+    @extend_schema(
+        tags=["Session"],
+        summary="세션 상세 조회",
+        parameters=[
+            OpenApiParameter(name="session_uuid", location=OpenApiParameter.PATH, type=str, description="세션 UUID")
+        ],
+        responses={200: OpenApiTypes.OBJECT, 404: OpenApiResponse(description="세션 없음")}
+    )
     def get(self, request, session_uuid):
         session = get_object_or_404(Session, uuid=session_uuid)
         qr = session.qr
@@ -69,6 +106,14 @@ class SessionDetailView(APIView):
         })
 
 class QRStatusView(APIView):
+    @extend_schema(
+        tags=["QR"],
+        summary="QR 상태 조회",
+        parameters=[
+            OpenApiParameter(name="slug", location=OpenApiParameter.PATH, type=str, description="QR 슬러그")
+        ],
+        responses={200: OpenApiTypes.OBJECT, 404: OpenApiResponse(description="QR 없음")}
+    )
     def get(self, request, slug):
         qr = get_object_or_404(QRCode, slug=slug)
         return Response({
@@ -80,6 +125,12 @@ class QRStatusView(APIView):
         })
 
 class ImageUploadView(APIView):
+    @extend_schema(
+        tags=["Image"],
+        summary="원본 이미지 업로드",
+        request=ImageUploadSerializer,
+        responses={201: OpenApiTypes.OBJECT, 400: OpenApiResponse(description="유효성 검증 오류"), 404: OpenApiResponse(description="세션 없음")}
+    )
     def post(self, request):
         s = ImageUploadSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -116,6 +167,12 @@ class ImageUploadView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 class FinalizeView(APIView):
+    @extend_schema(
+        tags=["Image"],
+        summary="최종 이미지 업로드 및 QR 타깃 연결",
+        request=FinalizeSerializer,
+        responses={201: OpenApiTypes.OBJECT, 400: OpenApiResponse(description="유효성 검증 오류"), 404: OpenApiResponse(description="세션 없음")}
+    )
     def post(self, request):
         s = FinalizeSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -164,6 +221,12 @@ class AIWebhookView(APIView):
     authentication_classes = []
     permission_classes = []
 
+    @extend_schema(
+        tags=["AI"],
+        summary="외부 AI 콜백",
+        request=AIWebhookSerializer,
+        responses={200: OpenApiTypes.OBJECT, 400: OpenApiResponse(description="유효성 검증 오류"), 404: OpenApiResponse(description="리소스 없음")}
+    )
     def post(self, request):
         s = AIWebhookSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -214,3 +277,13 @@ def redirect_by_slug(request, slug: str):
         return HttpResponseRedirect(qr.target_url)
     # 아직 타깃이 없으면 대기 페이지(간단 404 메시지로 대체)
     return HttpResponseNotFound("Your image is not ready yet.")
+
+class StyleListView(APIView):
+    @extend_schema(
+        tags=["Style"],
+        summary="스타일 목록 조회",
+        responses={200: StyleSerializer(many=True)}
+    )
+    def get(self, request):
+        qs = Style.objects.filter(is_active=True).order_by("id")
+        return Response(StyleSerializer(qs, many=True).data)
