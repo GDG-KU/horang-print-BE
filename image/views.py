@@ -87,7 +87,29 @@ class SessionDetailView(APIView):
         parameters=[
             OpenApiParameter(name="session_uuid", location=OpenApiParameter.PATH, type=str, description="세션 UUID")
         ],
-        responses={200: OpenApiTypes.OBJECT, 404: OpenApiResponse(description="세션 없음")}
+        responses={
+            200: OpenApiResponse(
+                response=OpenApiTypes.OBJECT,
+                description="세션 상태",
+                examples=[
+                    OpenApiExample(
+                        name="session-detail",
+                        response_only=True,
+                        value={
+                            "session_uuid": "c1f9c3d6-2a1b-4a1b-9d1c-2f5f7d3a0c1e",
+                            "status": "AI_REQUESTED",
+                            "qr": {
+                                "slug": "a1b2c3d4e",
+                                "redirect_url": "http://127.0.0.1:8000/s/a1b2c3d4e",
+                                "status": "READY",
+                                "qr_image_url": "https://storage.googleapis.com/bucket/qr/slug.png"
+                            }
+                        }
+                    )
+                ]
+            ),
+            404: OpenApiResponse(description="세션 없음")
+        }
     )
     def get(self, request, session_uuid):
         session = get_object_or_404(Session, uuid=session_uuid)
@@ -113,7 +135,39 @@ class SessionEventsView(APIView):
         parameters=[
             OpenApiParameter(name="session_uuid", location=OpenApiParameter.PATH, type=str, description="세션 UUID")
         ],
-        responses={200: OpenApiTypes.STR}
+        responses={
+            200: OpenApiResponse(
+                response=OpenApiTypes.STR,
+                description="text/event-stream",
+                examples=[
+                    OpenApiExample(
+                        name="progress-event",
+                        summary="RUNNING 이벤트",
+                        value="""event: progress\n"""
+                    ),
+                    OpenApiExample(
+                        name="progress-data",
+                        summary="RUNNING 데이터",
+                        value={
+                            "status": "RUNNING",
+                            "progress_percent": 95,
+                            "phase": "string",
+                            "message": "string"
+                        }
+                    ),
+                    OpenApiExample(
+                        name="completed",
+                        summary="완료 이벤트 데이터",
+                        value={"status": "SUCCEEDED", "ai_image_url": "https://.../ai_result.png"}
+                    ),
+                    OpenApiExample(
+                        name="failed",
+                        summary="실패 이벤트 데이터",
+                        value={"status": "FAILED"}
+                    )
+                ]
+            )
+        }
     )
     def get(self, request, session_uuid):
         # 존재 확인 후 SSE 연결
@@ -135,7 +189,26 @@ class QRStatusView(APIView):
         parameters=[
             OpenApiParameter(name="slug", location=OpenApiParameter.PATH, type=str, description="QR 슬러그")
         ],
-        responses={200: OpenApiTypes.OBJECT, 404: OpenApiResponse(description="QR 없음")}
+        responses={
+            200: OpenApiResponse(
+                response=OpenApiTypes.OBJECT,
+                description="QR 상태",
+                examples=[
+                    OpenApiExample(
+                        name="qr-status",
+                        response_only=True,
+                        value={
+                            "slug": "a1b2c3d4e",
+                            "status": "READY",
+                            "redirect_url": "http://127.0.0.1:8000/s/a1b2c3d4e",
+                            "qr_image_url": "https://storage.googleapis.com/bucket/qr/slug.png",
+                            "target_url": "https://storage.googleapis.com/bucket/final/abc.png"
+                        }
+                    )
+                ]
+            ),
+            404: OpenApiResponse(description="QR 없음")
+        }
     )
     def get(self, request, slug):
         qr = get_object_or_404(QRCode, slug=slug)
@@ -152,7 +225,35 @@ class ImageUploadView(APIView):
         tags=["Image"],
         summary="원본 이미지 업로드",
         request=ImageUploadSerializer,
-        responses={201: OpenApiTypes.OBJECT, 400: OpenApiResponse(description="유효성 검증 오류"), 404: OpenApiResponse(description="세션 없음")}
+        responses={
+            201: OpenApiResponse(
+                response=OpenApiTypes.OBJECT,
+                description="업로드 성공",
+                examples=[
+                    OpenApiExample(
+                        name="image-upload-success",
+                        response_only=True,
+                        value={
+                            "session_status": "UPLOADED",
+                            "original_image_url": "https://storage.googleapis.com/bucket/original/abc.png"
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(description="유효성 검증 오류"),
+            404: OpenApiResponse(description="세션 없음")
+        },
+        examples=[
+            OpenApiExample(
+                name="multipart-form",
+                summary="multipart/form-data 예시",
+                description="이미지는 multipart로 업로드합니다.",
+                value={
+                    "session_uuid": "c1f9c3d6-2a1b-4a1b-9d1c-2f5f7d3a0c1e",
+                    # NOTE: 파일은 Swagger UI에서 'image_file' 필드로 파일 선택합니다.
+                }
+            )
+        ]
     )
     def post(self, request):
         s = ImageUploadSerializer(data=request.data)
@@ -194,7 +295,39 @@ class FinalizeView(APIView):
         tags=["Image"],
         summary="최종 이미지 업로드 및 QR 타깃 연결",
         request=FinalizeSerializer,
-        responses={201: OpenApiTypes.OBJECT, 400: OpenApiResponse(description="유효성 검증 오류"), 404: OpenApiResponse(description="세션 없음")}
+        responses={
+            201: OpenApiResponse(
+                response=OpenApiTypes.OBJECT,
+                description="최종 업로드 성공",
+                examples=[
+                    OpenApiExample(
+                        name="finalize-success",
+                        response_only=True,
+                        value={
+                            "final_image": {"public_url": "https://storage.googleapis.com/bucket/final/abc.png"},
+                            "qr": {
+                                "redirect_url": "http://127.0.0.1:8000/s/a1b2c3d4e",
+                                "qr_image_url": "https://storage.googleapis.com/bucket/qr/slug.png"
+                            },
+                            "session_status": "FINALIZED"
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(description="유효성 검증 오류"),
+            404: OpenApiResponse(description="세션 없음")
+        },
+        examples=[
+            OpenApiExample(
+                name="multipart-form",
+                summary="multipart/form-data 예시",
+                description="이미지는 multipart로 업로드합니다.",
+                value={
+                    "session_uuid": "c1f9c3d6-2a1b-4a1b-9d1c-2f5f7d3a0c1e"
+                    # NOTE: Swagger UI에서 'edited_image' 파일을 선택하세요.
+                }
+            )
+        ]
     )
     def post(self, request):
         s = FinalizeSerializer(data=request.data)
@@ -248,7 +381,48 @@ class AIWebhookView(APIView):
         tags=["AI"],
         summary="외부 AI 콜백",
         request=AIWebhookSerializer,
-        responses={200: OpenApiTypes.OBJECT, 400: OpenApiResponse(description="유효성 검증 오류"), 404: OpenApiResponse(description="리소스 없음")}
+        responses={
+            200: OpenApiResponse(
+                response=OpenApiTypes.OBJECT,
+                description="수신 성공",
+                examples=[
+                    OpenApiExample(
+                        name="running",
+                        summary="진행 중 업데이트",
+                        response_only=False,
+                        value={
+                            "request_id": "job_123",
+                            "status": "RUNNING",
+                            "progress_percent": 42,
+                            "phase": "upscaling",
+                            "message": "denoise pass 2/3"
+                        }
+                    ),
+                    OpenApiExample(
+                        name="succeeded",
+                        summary="완료",
+                        response_only=False,
+                        value={
+                            "request_id": "job_123",
+                            "status": "SUCCEEDED",
+                            "image_url": "https://ai.example.com/outputs/job_123.png"
+                        }
+                    ),
+                    OpenApiExample(
+                        name="failed",
+                        summary="실패",
+                        response_only=False,
+                        value={
+                            "request_id": "job_123",
+                            "status": "FAILED",
+                            "meta": {"error_code": "OOM", "detail": "out of memory"}
+                        }
+                    )
+                ]
+            ),
+            400: OpenApiResponse(description="유효성 검증 오류"),
+            404: OpenApiResponse(description="리소스 없음")
+        }
     )
     def post(self, request):
         s = AIWebhookSerializer(data=request.data)
@@ -325,7 +499,22 @@ class StyleListView(APIView):
     @extend_schema(
         tags=["Style"],
         summary="스타일 목록 조회",
-        responses={200: StyleSerializer(many=True)}
+        responses={
+            200: OpenApiResponse(
+                response=StyleSerializer(many=True),
+                description="스타일 목록",
+                examples=[
+                    OpenApiExample(
+                        name="styles",
+                        response_only=True,
+                        value=[
+                            {"id": 1, "code": "cartoon_v1", "name": "Cartoon", "description": "...", "is_active": True},
+                            {"id": 2, "code": "sketch_v2", "name": "Sketch", "description": "...", "is_active": True}
+                        ]
+                    )
+                ]
+            )
+        }
     )
     def get(self, request):
         qs = Style.objects.filter(is_active=True).order_by("id")

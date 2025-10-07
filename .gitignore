@@ -142,10 +142,3 @@ GitHub.sublime-settings
 
 secret
 .idea
-
-*.pyc
-image/migrations/__pycache__/__init__.cpython-312.pyc
-image/migrations/__pycache__/0001_initial.cpython-312.pyc
-image/utils/__pycache__/gcs.cpython-312.pyc
-image/utils/__pycache__/images.cpython-312.pyc
-image/utils/__pycache__/qr.cpython-312.pyc
