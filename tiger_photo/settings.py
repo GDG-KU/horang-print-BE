@@ -35,11 +35,11 @@ WSGI_APPLICATION = "tiger_photo.wsgi.application"
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'tiger_photo_db',
-        'USER': 'tiger_photo_user',
-        'PASSWORD': 'lqB059IEckTRyglM',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.getenv("DB_NAME", "tiger_photo_db"),
+        'USER': os.getenv("DB_USER", "tiger_photo_user"),
+        'PASSWORD': os.getenv("DB_PASSWORD", "default_password"),
+        'HOST': os.getenv("DB_HOST", "localhost"),
+        'PORT': os.getenv("DB_PORT", "5432"),
     }
 }
 
