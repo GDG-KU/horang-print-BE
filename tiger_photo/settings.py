@@ -104,6 +104,6 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,  # /schema/ 경로는 따로 열어주므로 False 권장
     "COMPONENT_SPLIT_REQUEST": True,
-    "SERVERS": [{"url": "http://127.0.0.1:8000"}],  # 필요시 prod/staging 추가
+    "SERVERS": [{"url": "http://34.50.8.24"}],  # 필요시 prod/staging 추가
     # 인증 쓰면 여기에 SECURITY_SCHEMES 정의 가능 (예: JWT)
 }
