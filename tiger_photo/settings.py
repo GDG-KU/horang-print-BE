@@ -74,6 +74,9 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
 CELERY_TASK_ALWAYS_EAGER = False  # 개발에서 동기 실행하려면 True
 
+# Redis for SSE/pubsub (fallback to Celery broker)
+REDIS_URL = os.getenv("REDIS_URL", CELERY_BROKER_URL)
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

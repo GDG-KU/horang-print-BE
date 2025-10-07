@@ -1,7 +1,7 @@
 import io, mimetypes
 from django.conf import settings
 from django.db import transaction
-from django.http import HttpResponseRedirect, HttpResponseNotFound
+from django.http import HttpResponseRedirect, HttpResponseNotFound, StreamingHttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -15,6 +15,7 @@ from .utils.gcs import upload_fileobj, build_object_name, upload_bytes
 from .utils.images import get_image_size
 from .utils.qr import build_redirect_url
 from .tasks import generate_qr_task
+from .utils.events import stream_session_events, publish_session_event
 from drf_spectacular.utils import (
     extend_schema, OpenApiParameter, OpenApiTypes, OpenApiResponse, OpenApiExample
 )
@@ -104,6 +105,28 @@ class SessionDetailView(APIView):
             "status": session.status,
             "qr": qr_obj
         })
+
+class SessionEventsView(APIView):
+    @extend_schema(
+        tags=["Session"],
+        summary="세션 SSE 이벤트 스트림",
+        parameters=[
+            OpenApiParameter(name="session_uuid", location=OpenApiParameter.PATH, type=str, description="세션 UUID")
+        ],
+        responses={200: OpenApiTypes.STR}
+    )
+    def get(self, request, session_uuid):
+        # 존재 확인 후 SSE 연결
+        get_object_or_404(Session, uuid=session_uuid)
+
+        def event_stream():
+            for chunk in stream_session_events(str(session_uuid)):
+                yield chunk
+
+        response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response
 
 class QRStatusView(APIView):
     @extend_schema(
@@ -237,6 +260,18 @@ class AIWebhookView(APIView):
         job = get_object_or_404(AIJob, request_id=request_id)
         job.response_payload = s.validated_data
 
+        if status_str == "RUNNING":
+            job.status = AIJob.Status.RUNNING
+            job.response_payload = s.validated_data
+            job.save(update_fields=["status","response_payload","updated_at"])
+            publish_session_event(str(job.session.uuid), "progress", {
+                "status": job.status,
+                "progress_percent": s.validated_data.get("progress_percent"),
+                "phase": s.validated_data.get("phase"),
+                "message": s.validated_data.get("message"),
+            })
+            return Response({"ok": True})
+
         if status_str == "SUCCEEDED" and image_url:
             # 외부 URL을 받아 우리 GCS로 저장(간단히 프록시 저장: 다운로드 후 업로드가 이상적이나
             # 여기선 샘플로 URL 원문을 저장했다고 가정하거나, 별도 파이프라인으로 처리)
@@ -261,12 +296,20 @@ class AIWebhookView(APIView):
             job.session.status = Session.Status.AI_READY
             job.session.save(update_fields=["status","updated_at"])
 
+            job.save(update_fields=["response_payload","ai_image","status","updated_at"])
+            publish_session_event(str(job.session.uuid), "completed", {
+                "status": job.status,
+                "ai_image_url": asset.public_url,
+            })
         else:
             job.status = AIJob.Status.FAILED
             job.session.status = Session.Status.FAILED
             job.session.save(update_fields=["status","updated_at"])
 
-        job.save(update_fields=["response_payload","ai_image","status","updated_at"])
+            job.save(update_fields=["response_payload","ai_image","status","updated_at"])
+            publish_session_event(str(job.session.uuid), "failed", {
+                "status": job.status,
+            })
         return Response({"ok": True})
 
 def redirect_by_slug(request, slug: str):
