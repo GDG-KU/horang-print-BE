@@ -2,7 +2,6 @@ import json
 import time
 import contextlib
 from typing import Generator, Optional
-
 from django.conf import settings
 import redis
 

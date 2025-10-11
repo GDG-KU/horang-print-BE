@@ -15,6 +15,7 @@ django-cors-headers==4.4.0
 djangorestframework==3.16.1
 drf-spectacular==0.28.0
 drf-spectacular-sidecar==2025.10.1
+django-storages[google]==1.14.4
 google-api-core==2.25.2
 google-auth==2.41.1
 google-cloud-core==2.4.3
