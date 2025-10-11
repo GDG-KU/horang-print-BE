@@ -2,7 +2,8 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+if os.getenv("DJANGO_LOAD_DOTENV", "true").lower() == "true":
+    load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
@@ -104,6 +105,28 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,  # /schema/ 경로는 따로 열어주므로 False 권장
     "COMPONENT_SPLIT_REQUEST": True,
-    "SERVERS": [{"url": "http://127.0.0.1:8000"}],  # 필요시 prod/staging 추가
+    "SERVERS": [{"url": "https://horangprint.site"}],  # 필요시 prod/staging 추가
     # 인증 쓰면 여기에 SECURITY_SCHEMES 정의 가능 (예: JWT)
 }
+
+# 1) 호스트/CSRF 설정
+ALLOWED_HOSTS = os.getenv(
+    "DJANGO_ALLOWED_HOSTS",
+    "horangprint.site,www.horangprint.site,127.0.0.1,localhost"
+).split(",")
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://horangprint.site",
+    "https://www.horangprint.site",
+]
+
+# 2) 프록시 뒤에서 HTTPS 인식 (Cloudflare/Nginx가 X-Forwarded-Proto를 넣어줌)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True  # (선택) Host 헤더 신뢰 — Nginx에서 Host 전달 중이면 유용
+
+# 3) 운영 보안 (DEBUG=False일 때 권장)
+if not os.getenv("DJANGO_DEBUG", "False").lower() in ("1", "true", "yes"):
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # Nginx에서 80->443 리다이렉트 이미 하는 중이면 굳이 강제 안 해도 됨
+    # SECURE_SSL_REDIRECT = True
