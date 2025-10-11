@@ -47,7 +47,7 @@ class SessionCreateView(APIView):
                     "status": "CREATED",
                     "qr": {
                         "slug": "a1b2c3d4e",
-                        "redirect_url": "http://127.0.0.1:8000/s/a1b2c3d4e",
+                        "redirect_url": "http://34.50.8.24/s/a1b2c3d4e",
                         "status": "PENDING"
                     }
                 }
@@ -100,7 +100,7 @@ class SessionDetailView(APIView):
                             "status": "AI_REQUESTED",
                             "qr": {
                                 "slug": "a1b2c3d4e",
-                                "redirect_url": "http://127.0.0.1:8000/s/a1b2c3d4e",
+                                "redirect_url": "http://34.50.8.24/s/a1b2c3d4e",
                                 "status": "READY",
                                 "qr_image_url": "https://storage.googleapis.com/bucket/qr/slug.png"
                             }
@@ -200,7 +200,7 @@ class QRStatusView(APIView):
                         value={
                             "slug": "a1b2c3d4e",
                             "status": "READY",
-                            "redirect_url": "http://127.0.0.1:8000/s/a1b2c3d4e",
+                            "redirect_url": "http://34.50.8.24/s/a1b2c3d4e",
                             "qr_image_url": "https://storage.googleapis.com/bucket/qr/slug.png",
                             "target_url": "https://storage.googleapis.com/bucket/final/abc.png"
                         }
@@ -306,7 +306,7 @@ class FinalizeView(APIView):
                         value={
                             "final_image": {"public_url": "https://storage.googleapis.com/bucket/final/abc.png"},
                             "qr": {
-                                "redirect_url": "http://127.0.0.1:8000/s/a1b2c3d4e",
+                                "redirect_url": "http://34.50.8.24/s/a1b2c3d4e",
                                 "qr_image_url": "https://storage.googleapis.com/bucket/qr/slug.png"
                             },
                             "session_status": "FINALIZED"
