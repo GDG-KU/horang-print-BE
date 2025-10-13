@@ -3,7 +3,7 @@ from .models import Style, Session, ImageAsset, AIJob, QRCode
 
 @admin.register(Style)
 class StyleAdmin(admin.ModelAdmin):
-    list_display = ("id","code","name","is_active","created_at")
+    list_display = ("id","code","name","is_active","created_at","thumbnail_url")
 
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
