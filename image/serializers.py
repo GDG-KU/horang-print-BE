@@ -24,4 +24,4 @@ class AIWebhookSerializer(serializers.Serializer):
 class StyleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Style
-        fields = ("id","code","name","description","is_active")
+        fields = ("id","code","name","description","is_active","thumbnail_url")

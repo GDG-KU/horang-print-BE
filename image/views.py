@@ -508,8 +508,8 @@ class StyleListView(APIView):
                         name="styles",
                         response_only=True,
                         value=[
-                            {"id": 1, "code": "cartoon_v1", "name": "Cartoon", "description": "...", "is_active": True},
-                            {"id": 2, "code": "sketch_v2", "name": "Sketch", "description": "...", "is_active": True}
+                            {"id": 1, "code": "cartoon_v1", "name": "Cartoon", "description": "...", "is_active": True, "thumbnail_url": "https://example.com/cartoon.png"},
+                            {"id": 2, "code": "sketch_v2", "name": "Sketch", "description": "...", "is_active": True, "thumbnail_url": "https://example.com/sketch.png"}
                         ]
                     )
                 ]
