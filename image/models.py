@@ -6,6 +6,7 @@ class Style(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    thumbnail_url = models.URLField(max_length=1024, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     def __str__(self): return f"{self.name}({self.code})"
