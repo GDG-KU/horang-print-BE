@@ -283,7 +283,7 @@ class ImageUploadView(APIView):
         session.save(update_fields=["status","updated_at"])
 
         # 업로드 직후 내부 AI 생성 파이프라인 트리거
-        prompt = (session.style.description or session.style.name or "Transform the photo")
+        prompt = (getattr(session.style, "prompt", None) or session.style.description or session.style.name or "Transform the photo")
         job = AIJob.objects.create(
             session=session,
             status=AIJob.Status.PENDING,

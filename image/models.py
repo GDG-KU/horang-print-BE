@@ -5,6 +5,7 @@ class Style(models.Model):
     code = models.CharField(max_length=50, unique=True, db_index=True)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
+    prompt = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
     thumbnail_url = models.URLField(max_length=1024, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

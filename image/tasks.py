@@ -93,9 +93,9 @@ def run_ai_generation_task(self, ai_job_id: int):
         resp.raise_for_status()
         image = Image.open(io.BytesIO(resp.content))
 
-        # Build prompt from Style description (fallback to name)
+        # Build prompt from Style.prompt (fallback to description/name)
         style = job.session.style
-        prompt = (style.description or style.name or "Transform the photo")[:4000]
+        prompt = (getattr(style, "prompt", None) or style.description or style.name or "Transform the photo")[:4000]
 
         # Call Gemini to generate content
         from google import genai
