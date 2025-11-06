@@ -9,12 +9,13 @@ from django.shortcuts import get_object_or_404
 from .models import Session, Style, ImageAsset, AIJob, QRCode
 from .serializers import (
     SessionCreateSerializer, ImageUploadSerializer,
-    FinalizeSerializer, AIWebhookSerializer, StyleSerializer
+    FinalizeSerializer, StyleSerializer
 )
 from .utils.gcs import upload_fileobj, build_object_name, upload_bytes
 from .utils.images import get_image_size
 from .utils.qr import build_redirect_url
 from .tasks import generate_qr_task
+from .tasks import run_ai_generation_task
 from .utils.events import stream_session_events, publish_session_event
 from drf_spectacular.utils import (
     extend_schema, OpenApiParameter, OpenApiTypes, OpenApiResponse, OpenApiExample
@@ -281,9 +282,27 @@ class ImageUploadView(APIView):
         session.status = Session.Status.UPLOADED
         session.save(update_fields=["status","updated_at"])
 
-        # (선택) 여기서 AIJob 생성 및 외부팀 호출 트리거 가능
-        # job = AIJob.objects.create(session=session, status=AIJob.Status.PENDING, request_payload={...})
-        # 외부 호출 후 request_id 저장
+        # 업로드 직후 내부 AI 생성 파이프라인 트리거
+        prompt = (session.style.description or session.style.name or "Transform the photo")
+        job = AIJob.objects.create(
+            session=session,
+            status=AIJob.Status.PENDING,
+            request_payload={
+                "model": "gemini-2.5-flash-image",
+                "prompt": prompt,
+            }
+        )
+
+        # 상태 전이 및 이벤트 알림
+        session.status = Session.Status.AI_REQUESTED
+        session.save(update_fields=["status","updated_at"])
+        publish_session_event(str(session.uuid), "progress", {
+            "status": session.status,
+            "message": "AI generation requested"
+        })
+
+        # 비동기 AI 작업 실행
+        run_ai_generation_task.delay(job.id)
 
         return Response({
             "session_status": session.status,
@@ -370,121 +389,6 @@ class FinalizeView(APIView):
             "session_status": session.status
         }, status=status.HTTP_201_CREATED)
 
-class AIWebhookView(APIView):
-    """
-    외부 AI팀이 변환 완료 후 호출하는 콜백 예시
-    """
-    authentication_classes = []
-    permission_classes = []
-
-    @extend_schema(
-        tags=["AI"],
-        summary="외부 AI 콜백",
-        request=AIWebhookSerializer,
-        responses={
-            200: OpenApiResponse(
-                response=OpenApiTypes.OBJECT,
-                description="수신 성공",
-                examples=[
-                    OpenApiExample(
-                        name="running",
-                        summary="진행 중 업데이트",
-                        response_only=False,
-                        value={
-                            "request_id": "job_123",
-                            "status": "RUNNING",
-                            "progress_percent": 42,
-                            "phase": "upscaling",
-                            "message": "denoise pass 2/3"
-                        }
-                    ),
-                    OpenApiExample(
-                        name="succeeded",
-                        summary="완료",
-                        response_only=False,
-                        value={
-                            "request_id": "job_123",
-                            "status": "SUCCEEDED",
-                            "image_url": "https://ai.example.com/outputs/job_123.png"
-                        }
-                    ),
-                    OpenApiExample(
-                        name="failed",
-                        summary="실패",
-                        response_only=False,
-                        value={
-                            "request_id": "job_123",
-                            "status": "FAILED",
-                            "meta": {"error_code": "OOM", "detail": "out of memory"}
-                        }
-                    )
-                ]
-            ),
-            400: OpenApiResponse(description="유효성 검증 오류"),
-            404: OpenApiResponse(description="리소스 없음")
-        }
-    )
-    def post(self, request):
-        s = AIWebhookSerializer(data=request.data)
-        s.is_valid(raise_exception=True)
-        request_id = s.validated_data["request_id"]
-        status_str = s.validated_data["status"]
-        image_url = s.validated_data.get("image_url")
-
-        job = get_object_or_404(AIJob, request_id=request_id)
-        job.response_payload = s.validated_data
-
-        if status_str == "RUNNING":
-            job.status = AIJob.Status.RUNNING
-            job.response_payload = s.validated_data
-            job.save(update_fields=["status","response_payload","updated_at"])
-            publish_session_event(str(job.session.uuid), "progress", {
-                "status": job.status,
-                "progress_percent": s.validated_data.get("progress_percent"),
-                "phase": s.validated_data.get("phase"),
-                "message": s.validated_data.get("message"),
-            })
-            return Response({"ok": True})
-
-        if status_str == "SUCCEEDED" and image_url:
-            # 외부 URL을 받아 우리 GCS로 저장(간단히 프록시 저장: 다운로드 후 업로드가 이상적이나
-            # 여기선 샘플로 URL 원문을 저장했다고 가정하거나, 별도 파이프라인으로 처리)
-            # 데모: QR 코드 PNG 같은 바이트 업로드 예시처럼 흉내
-            import requests
-            r = requests.get(image_url, timeout=10)
-            r.raise_for_status()
-            object_name = build_object_name("ai", "ai_result.png")
-            gcs_path, public_url = upload_bytes(r.content, object_name, "image/png")
-            asset = ImageAsset.objects.create(
-                session=job.session,
-                kind=ImageAsset.Kind.AI,
-                gcs_path=gcs_path,
-                public_url=public_url,
-                mime="image/png",
-                size_bytes=len(r.content)
-            )
-            job.ai_image = asset
-            job.status = AIJob.Status.SUCCEEDED
-
-            # 세션 상태 업데이트
-            job.session.status = Session.Status.AI_READY
-            job.session.save(update_fields=["status","updated_at"])
-
-            job.save(update_fields=["response_payload","ai_image","status","updated_at"])
-            publish_session_event(str(job.session.uuid), "completed", {
-                "status": job.status,
-                "ai_image_url": asset.public_url,
-            })
-        else:
-            job.status = AIJob.Status.FAILED
-            job.session.status = Session.Status.FAILED
-            job.session.save(update_fields=["status","updated_at"])
-
-            job.save(update_fields=["response_payload","ai_image","status","updated_at"])
-            publish_session_event(str(job.session.uuid), "failed", {
-                "status": job.status,
-            })
-        return Response({"ok": True})
 
 def redirect_by_slug(request, slug: str):
     qr = QRCode.objects.filter(slug=slug).first()

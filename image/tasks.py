@@ -53,3 +53,117 @@ def generate_qr_task(self, qr_id: int):
             # If even this fails, at least log the original error
             logger.exception("generate_qr_task: failed with exception before updating model")
         raise
+
+
+@shared_task(bind=True, max_retries=0)
+def run_ai_generation_task(self, ai_job_id: int):
+    """Run Gemini-based image generation for a given AIJob."""
+    # Lazy imports to avoid Django app loading issues
+    from django.db import transaction
+    from .models import AIJob, ImageAsset, Session
+    from .utils.gcs import upload_bytes
+    from .utils.events import publish_session_event
+    from django.conf import settings
+    import io
+    import requests
+    from PIL import Image
+
+    try:
+        # Mark job as RUNNING
+        with transaction.atomic():
+            job = AIJob.objects.select_for_update().get(id=ai_job_id)
+            job.status = AIJob.Status.RUNNING
+            job.save(update_fields=["status", "updated_at"])
+
+        # Notify clients that AI generation has started
+        publish_session_event(str(job.session.uuid), "progress", {
+            "status": job.status,
+            "message": "AI generation started"
+        })
+
+        # Fetch original image bytes
+        original = ImageAsset.objects.filter(
+            session=job.session,
+            kind=ImageAsset.Kind.ORIGINAL
+        ).order_by("-id").first()
+        if not original or not original.public_url:
+            raise ValueError("Original image not found for session")
+
+        resp = requests.get(original.public_url, timeout=20)
+        resp.raise_for_status()
+        image = Image.open(io.BytesIO(resp.content))
+
+        # Build prompt from Style description (fallback to name)
+        style = job.session.style
+        prompt = (style.description or style.name or "Transform the photo")[:4000]
+
+        # Call Gemini to generate content
+        from google import genai
+        api_key = getattr(settings, "GOOGLE_GENAI_API_KEY", None)
+        if not api_key:
+            raise ValueError("GOOGLE_GENAI_API_KEY not configured")
+
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash-image",
+            contents=[image, prompt],
+        )
+
+        # Extract resulting image bytes
+        image_bytes_list = []
+        if response and getattr(response, "candidates", None):
+            first = response.candidates[0]
+            for part in getattr(first.content, "parts", []) or []:
+                if getattr(part, "inline_data", None):
+                    image_bytes_list.append(part.inline_data.data)
+
+        if not image_bytes_list:
+            raise ValueError("No image returned from AI")
+
+        result_bytes = image_bytes_list[0]
+
+        # Upload result to GCS and create ImageAsset
+        object_name = f"ai/{job.session.uuid}.png"
+        gcs_path, public_url = upload_bytes(result_bytes, object_name, "image/png")
+        asset = ImageAsset.objects.create(
+            session=job.session,
+            kind=ImageAsset.Kind.AI,
+            gcs_path=gcs_path,
+            public_url=public_url,
+            mime="image/png",
+            size_bytes=len(result_bytes),
+        )
+
+        # Update job and session
+        with transaction.atomic():
+            job.ai_image = asset
+            job.status = AIJob.Status.SUCCEEDED
+            job.save(update_fields=["ai_image", "status", "updated_at"])
+
+            job.session.status = Session.Status.AI_READY
+            job.session.save(update_fields=["status", "updated_at"])
+
+        # Publish completion event
+        publish_session_event(str(job.session.uuid), "completed", {
+            "status": job.status,
+            "ai_image_url": asset.public_url,
+        })
+
+    except Exception as e:
+        logger.exception("run_ai_generation_task failed: %s", e)
+        try:
+            job = AIJob.objects.get(id=ai_job_id)
+            job.status = AIJob.Status.FAILED
+            job.save(update_fields=["status", "updated_at"])
+
+            job.session.status = Session.Status.FAILED
+            job.session.save(update_fields=["status", "updated_at"])
+
+            publish_session_event(str(job.session.uuid), "failed", {
+                "status": job.status,
+                "message": str(e),
+            })
+        except Exception:
+            # best-effort update
+            pass
+        raise
