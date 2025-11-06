@@ -341,6 +341,9 @@ REDIS_URL = os.getenv("REDIS_URL", CELERY_BROKER_URL)
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "")
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 
+# Google GenAI API Key (used by internal AI generation task)
+GOOGLE_GENAI_API_KEY = os.getenv("GOOGLE_GENAI_API_KEY", "")
+
 # GCS Project and additional settings
 GCS_PROJECT_ID = os.getenv("GCS_PROJECT_ID", "")
 GCS_LOCATION = os.getenv("GCS_LOCATION", "asia-northeast3")  # Seoul region
