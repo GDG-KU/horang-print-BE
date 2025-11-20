@@ -31,8 +31,11 @@ def upload_bytes(data: bytes, object_name: str, content_type: str) -> Tuple[str,
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(object_name)
     blob.upload_from_string(data, content_type=content_type)
-    # 공개 액세스(퍼블릭 버킷이거나 IAM으로 공개) 가정
-    public_url = f"https://storage.googleapis.com/{bucket_name}/{object_name}"
+    
+    # Use custom domain if configured, otherwise fall back to default GCS URL
+    prefix = getattr(settings, "GCS_PUBLIC_URL_PREFIX", f"https://storage.googleapis.com/{bucket_name}").rstrip("/")
+    public_url = f"{prefix}/{object_name}"
+    
     gcs_path = f"gs://{bucket_name}/{object_name}"
     return gcs_path, public_url
 
