@@ -32,7 +32,7 @@ class QRCodeInfoSerializer(serializers.ModelSerializer):
         fields = ('slug', 'target_url')
 
 class SessionListSerializer(serializers.ModelSerializer):
-    style = StyleSerializer(read_only=True)
+    style = serializers.SlugRelatedField(read_only=True, slug_field='code')
     qr = QRCodeInfoSerializer(read_only=True)
     class Meta:
         model = Session
