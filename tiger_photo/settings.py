@@ -339,7 +339,8 @@ REDIS_URL = os.getenv("REDIS_URL", CELERY_BROKER_URL)
 
 # Google Cloud Storage Configuration
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "")
-GCS_PUBLIC_URL_PREFIX = os.getenv("GCS_PUBLIC_URL_PREFIX", f"https://storage.googleapis.com/{GCS_BUCKET_NAME}")
+_default_gcs_prefix = f"https://storage.googleapis.com/{GCS_BUCKET_NAME}" if GCS_BUCKET_NAME else ""
+GCS_PUBLIC_URL_PREFIX = os.getenv("GCS_PUBLIC_URL_PREFIX", _default_gcs_prefix)
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 
 # Google GenAI API Key (used by internal AI generation task)
