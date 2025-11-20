@@ -36,4 +36,4 @@ class SessionListSerializer(serializers.ModelSerializer):
     qr = QRCodeInfoSerializer(read_only=True)
     class Meta:
         model = Session
-        fields = ('uuid', 'style', 'status', 'updated_at', 'qr')
+        fields = ('uuid', 'style', 'status', 'created_at', 'updated_at', 'qr')
