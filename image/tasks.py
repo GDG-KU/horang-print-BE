@@ -55,6 +55,84 @@ def generate_qr_task(self, qr_id: int):
         raise
 
 
+def _generate_content_default(client, image, prompt: str):
+    """Default image generation with a simple prompt."""
+    from google.genai import types
+    generate_content_config = types.GenerateContentConfig(
+        top_p=0.95,
+        response_modalities=[
+            "IMAGE",
+        ],
+        image_config=types.ImageConfig(
+            image_size="1K",
+        ),
+    )
+    return client.models.generate_content(
+        model="gemini-2.5-flash-image",
+        contents=[image, prompt],
+        config=generate_content_config,
+    )
+
+def pil_to_bytes(img) -> bytes:
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+def _generate_content_animal_crossing(client, user_image, prompt: str):
+    """Image generation for Animal Crossing with a style reference image."""
+    import io
+    import requests
+    from PIL import Image
+    from google.genai import types
+
+    # TODO: Replace with the actual public URL of the Animal Crossing style image
+    ANIMAL_CROSSING_STYLE_IMAGE_URL = "https://file.horangprint.site/ref/animal_crossing_style.png"
+
+    resp = requests.get(ANIMAL_CROSSING_STYLE_IMAGE_URL, timeout=20)
+    resp.raise_for_status()
+    style_image = Image.open(io.BytesIO(resp.content)).convert("RGBA")
+
+    user_img_bytes = pil_to_bytes(user_image)
+    style_img_bytes = pil_to_bytes(style_image)
+
+    generate_content_config = types.GenerateContentConfig(
+        top_p=0.8,
+        response_modalities=["IMAGE"],
+        image_config=types.ImageConfig(
+            image_size="1K",
+        ),
+    )
+
+    # Build multi-part content
+    contents = [
+        types.Content(
+            role="user",
+            parts=[
+                types.Part.from_text(
+                    "Use the second image as the style reference (Animal Crossing style). "
+                    + prompt
+                ),
+                types.Part.from_bytes(
+                    data=style_img_bytes,
+                    mime_type="image/png",
+                ),
+                types.Part.from_bytes(
+                    data=user_img_bytes,
+                    mime_type="image/png",
+                ),
+            ],
+        )
+    ]
+
+    return client.models.generate_content(
+        model="gemini-2.5-flash-image",
+        contents=contents,
+        config=generate_content_config,
+    )
+
+
 @shared_task(bind=True, max_retries=0)
 def run_ai_generation_task(self, ai_job_id: int):
     """Run Gemini-based image generation for a given AIJob."""
@@ -104,10 +182,14 @@ def run_ai_generation_task(self, ai_job_id: int):
             raise ValueError("GOOGLE_GENAI_API_KEY not configured")
 
         client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-image",
-            contents=[image, prompt],
-        )
+
+        # Choose generation function based on style
+        if style and style.code and "animal-crossing" in style.code:
+            logger.info("Using Animal Crossing style generation for job %d", ai_job_id)
+            response = _generate_content_animal_crossing(client, image, prompt)
+        else:
+            logger.info("Using default style generation for job %d", ai_job_id)
+            response = _generate_content_default(client, image, prompt)
 
         # Extract resulting image bytes
         image_bytes_list = []
