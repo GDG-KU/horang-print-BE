@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404
 from .models import Session, Style, ImageAsset, AIJob, QRCode
 from .serializers import (
     SessionCreateSerializer, ImageUploadSerializer,
-    FinalizeSerializer, StyleSerializer
+    FinalizeSerializer, StyleSerializer, SessionListSerializer
 )
 from .utils.gcs import upload_fileobj, build_object_name, upload_bytes
 from .utils.images import get_image_size
@@ -398,6 +398,19 @@ def redirect_by_slug(request, slug: str):
         return HttpResponseRedirect(qr.target_url)
     # 아직 타깃이 없으면 대기 페이지(간단 404 메시지로 대체)
     return HttpResponseNotFound("Your image is not ready yet.")
+
+class SessionListView(APIView):
+    @extend_schema(
+        tags=["Session"],
+        summary="세션 목록 조회",
+        responses={
+            200: SessionListSerializer(many=True)
+        }
+    )
+    def get(self, request):
+        qs = Session.objects.select_related('style', 'qr').all().order_by('-updated_at')
+        serializer = SessionListSerializer(qs, many=True)
+        return Response(serializer.data)
 
 class StyleListView(APIView):
     @extend_schema(

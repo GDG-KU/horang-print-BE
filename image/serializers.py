@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Session, Style
+from .models import Session, Style, QRCode
 
 class SessionCreateSerializer(serializers.Serializer):
     style_id = serializers.IntegerField()
@@ -25,3 +25,15 @@ class StyleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Style
         fields = ("id","code","name","description","is_active","thumbnail_url")
+
+class QRCodeInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QRCode
+        fields = ('slug', 'target_url')
+
+class SessionListSerializer(serializers.ModelSerializer):
+    style = StyleSerializer(read_only=True)
+    qr = QRCodeInfoSerializer(read_only=True)
+    class Meta:
+        model = Session
+        fields = ('uuid', 'style', 'status', 'updated_at', 'qr')
