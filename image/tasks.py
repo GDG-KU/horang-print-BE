@@ -87,14 +87,13 @@ def _generate_content_animal_crossing(client, user_image, prompt: str):
     from PIL import Image
     from google.genai import types
 
-    # TODO: Replace with the actual public URL of the Animal Crossing style image
     ANIMAL_CROSSING_STYLE_IMAGE_URL = "https://file.horangprint.site/ref/animal_crossing_style.png"
 
     resp = requests.get(ANIMAL_CROSSING_STYLE_IMAGE_URL, timeout=20)
     resp.raise_for_status()
     style_image = Image.open(io.BytesIO(resp.content)).convert("RGBA")
 
-    user_img_bytes = pil_to_bytes(user_image)
+    user_img_bytes = pil_to_bytes(user_image.convert("RGBA"))
     style_img_bytes = pil_to_bytes(style_image)
 
     generate_content_config = types.GenerateContentConfig(
@@ -107,23 +106,27 @@ def _generate_content_animal_crossing(client, user_image, prompt: str):
 
     # Build multi-part content
     contents = [
-        types.Content(
-            role="user",
-            parts=[
-                types.Part.from_text(
-                    "Use the second image as the style reference (Animal Crossing style). "
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "text": "Use the second image as the style reference (Animal Crossing style). "
                     + prompt
-                ),
-                types.Part.from_bytes(
-                    data=style_img_bytes,
-                    mime_type="image/png",
-                ),
-                types.Part.from_bytes(
-                    data=user_img_bytes,
-                    mime_type="image/png",
-                ),
+                },
+                {
+                    "inline_data": {
+                        "mime_type": "image/png",
+                        "data": style_img_bytes,
+                    }
+                },
+                {
+                    "inline_data": {
+                        "mime_type": "image/png",
+                        "data": user_img_bytes,
+                    }
+                },
             ],
-        )
+        }
     ]
 
     return client.models.generate_content(
