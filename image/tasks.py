@@ -66,6 +66,7 @@ def _generate_content_default(client, image, prompt: str):
         image_config=types.ImageConfig(
             image_size="1K",
         ),
+        number_of_images=1,
     )
     return client.models.generate_content(
         model="gemini-3-pro-image-preview",
@@ -102,6 +103,8 @@ def _generate_content_animal_crossing(client, user_image, prompt: str):
         image_config=types.ImageConfig(
             image_size="1K",
         ),
+        number_of_images=1,
+
     )
 
     # Build multi-part content
