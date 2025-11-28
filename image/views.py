@@ -288,7 +288,7 @@ class ImageUploadView(APIView):
             session=session,
             status=AIJob.Status.PENDING,
             request_payload={
-                "model": "gemini-2.5-flash-image",
+                "model": "gemini-3-pro-image-preview",
                 "prompt": prompt,
             }
         )

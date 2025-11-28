@@ -68,7 +68,7 @@ def _generate_content_default(client, image, prompt: str):
         ),
     )
     return client.models.generate_content(
-        model="gemini-2.5-flash-image",
+        model="gemini-3-pro-image-preview",
         contents=[image, prompt],
         #config=generate_content_config,
     )
@@ -130,7 +130,7 @@ def _generate_content_animal_crossing(client, user_image, prompt: str):
     ]
 
     return client.models.generate_content(
-        model="gemini-2.5-flash-image",
+        model="gemini-3-pro-image-preview",
         contents=contents,
         #config=generate_content_config,
     )
@@ -177,6 +177,7 @@ def run_ai_generation_task(self, ai_job_id: int):
         # Build prompt from Style.prompt (fallback to description/name)
         style = job.session.style
         prompt = (getattr(style, "prompt", None) or style.description or style.name or "Transform the photo")[:4000]
+        #prompt = prompt.encode("ascii", "ignore").decode("ascii")
 
         # Call Gemini to generate content
         from google import genai
