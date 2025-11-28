@@ -70,7 +70,7 @@ def _generate_content_default(client, image, prompt: str):
     return client.models.generate_content(
         model="gemini-3-pro-image-preview",
         contents=[image, prompt],
-        #config=generate_content_config,
+        config=generate_content_config,
     )
 
 def pil_to_bytes(img) -> bytes:
@@ -132,7 +132,7 @@ def _generate_content_animal_crossing(client, user_image, prompt: str):
     return client.models.generate_content(
         model="gemini-3-pro-image-preview",
         contents=contents,
-        #config=generate_content_config,
+        config=generate_content_config,
     )
 
 
