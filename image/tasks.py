@@ -64,6 +64,7 @@ def _generate_content_default(client, image, prompt: str):
             "IMAGE",
         ],
         image_config=types.ImageConfig(
+            aspect_ratio="1:1",
             image_size="1K",
         ),
     )
@@ -100,6 +101,7 @@ def _generate_content_animal_crossing(client, user_image, prompt: str):
         top_p=0.8,
         response_modalities=["IMAGE"],
         image_config=types.ImageConfig(
+            aspect_ratio="1:1",
             image_size="1K",
         ),
     )
