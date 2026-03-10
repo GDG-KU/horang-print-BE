@@ -87,7 +87,7 @@ def _generate_content_animal_crossing(client, user_image, prompt: str):
     from PIL import Image
     from google.genai import types
 
-    ANIMAL_CROSSING_STYLE_IMAGE_URL = "https://file.horangprint.site/ref/animal_crossing_style.png"
+    ANIMAL_CROSSING_STYLE_IMAGE_URL = "https://file.horangprint.site/ref/animal_crossing_ref_2.png"
 
     resp = requests.get(ANIMAL_CROSSING_STYLE_IMAGE_URL, timeout=20)
     resp.raise_for_status()
